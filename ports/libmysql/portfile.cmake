@@ -1,27 +1,26 @@
-vcpkg_fail_port_install(ON_TARGET "UWP" ON_ARCH "x86")
-
 if (EXISTS "${CURRENT_INSTALLED_DIR}/include/mysql/mysql.h")
     message(FATAL_ERROR "FATAL ERROR: libmysql and libmariadb are incompatible.")
 endif()
 
-if (VCPKG_CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    message(WARNING "libmysql needs ncurses on LINUX, please install ncurses first.\nOn Debian/Ubuntu, package name is libncurses5-dev, on Redhat and derivates it is ncurses-devel.")
+if(VCPKG_CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
+    message(FATAL_ERROR "libmysql cannot currently be cross-compiled for UWP")
 endif()
+
+include(vcpkg_common_functions)
 
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO mysql/mysql-server
-    REF mysql-8.0.4
-    SHA512 8d9129e7670e88df14238299052a5fe6d4f3e40bf27ef7a3ca8f4f91fb40507b13463e9bd24435b34e5d06c5d056dfb259fb04e77cc251b188eea734db5642be
+    REF mysql-5.7.17
+    SHA512 31488972e08a6b83f88e6e3f7923aca91e01eac702f4942fdae92e13f66d92ac86c24dfe7a65a001db836c900147d1c3871b36af8cbb281a0e6c555617cac12c
     HEAD_REF master
-    PATCHES
-        ignore-boost-version.patch
-        system-libs.patch
-        linux_libmysql.patch
-        re2_add_compile_flags.patch
 )
 
-file(REMOVE_RECURSE ${SOURCE_PATH}/include/boost_1_65_0)
+vcpkg_apply_patches(
+    SOURCE_PATH ${SOURCE_PATH}
+    PATCHES
+        ${CMAKE_CURRENT_LIST_DIR}/boost_and_build.patch
+)
 
 set(STACK_DIRECTION)
 if(VCPKG_TARGET_ARCHITECTURE STREQUAL "x86" OR VCPKG_TARGET_ARCHITECTURE STREQUAL "x64")
@@ -30,7 +29,6 @@ endif()
 
 vcpkg_configure_cmake(
     SOURCE_PATH ${SOURCE_PATH}
-    PREFER_NINJA
     OPTIONS
         -DWITHOUT_SERVER=ON
         -DWITH_UNIT_TESTS=OFF
@@ -39,16 +37,9 @@ vcpkg_configure_cmake(
         -DHAVE_LLVM_LIBCPP_EXITCODE=1
         ${STACK_DIRECTION}
         -DWINDOWS_RUNTIME_MD=ON # Note: this disables _replacement_ of /MD with /MT. If /MT is specified, it will be preserved.
-        -DIGNORE_BOOST_VERSION=ON
-        -DWITH_SSL=system
-        -DWITH_ICU=system
-        -DWITH_LIBEVENT=system
-        -DWITH_LZMA=system
-        -DWITH_LZ4=system
-        -DWITH_ZLIB=system
 )
 
-vcpkg_install_cmake(ADD_BIN_TO_PATH)
+vcpkg_install_cmake()
 
 # delete debug headers
 file(REMOVE_RECURSE
@@ -67,14 +58,13 @@ file(REMOVE_RECURSE
     ${CURRENT_PACKAGES_DIR}/debug/bin
     ${CURRENT_PACKAGES_DIR}/docs
     ${CURRENT_PACKAGES_DIR}/debug/docs
-    ${CURRENT_PACKAGES_DIR}/lib/debug
-    ${CURRENT_PACKAGES_DIR}/lib/plugin/debug)
+    ${CURRENT_PACKAGES_DIR}/lib/debug)
 
 # remove misc files
 file(REMOVE
-    ${CURRENT_PACKAGES_DIR}/LICENSE
+    ${CURRENT_PACKAGES_DIR}/COPYING
     ${CURRENT_PACKAGES_DIR}/README
-    ${CURRENT_PACKAGES_DIR}/debug/LICENSE
+    ${CURRENT_PACKAGES_DIR}/debug/COPYING
     ${CURRENT_PACKAGES_DIR}/debug/README)
 
 # remove not-related libs
@@ -96,22 +86,14 @@ else()
         ${CURRENT_PACKAGES_DIR}/debug/lib/mysqlclient.lib)
 
     # correct the dll directory
-    if(NOT DEFINED VCPKG_BUILD_TYPE OR VCPKG_BUILD_TYPE STREQUAL "release")
-        file(MAKE_DIRECTORY ${CURRENT_PACKAGES_DIR}/bin)
-        file (RENAME ${CURRENT_PACKAGES_DIR}/lib/libmysql.dll ${CURRENT_PACKAGES_DIR}/bin/libmysql.dll)
-        file (RENAME ${CURRENT_PACKAGES_DIR}/lib/libmysql.pdb ${CURRENT_PACKAGES_DIR}/bin/libmysql.pdb)
-    endif()
-
-    if(NOT DEFINED VCPKG_BUILD_TYPE OR VCPKG_BUILD_TYPE STREQUAL "debug")
-        file(MAKE_DIRECTORY ${CURRENT_PACKAGES_DIR}/debug/bin)
-        file (RENAME ${CURRENT_PACKAGES_DIR}/debug/lib/libmysql.dll ${CURRENT_PACKAGES_DIR}/debug/bin/libmysql.dll)
-        file (RENAME ${CURRENT_PACKAGES_DIR}/debug/lib/libmysql.pdb ${CURRENT_PACKAGES_DIR}/debug/bin/libmysql.pdb)
-    endif()
+    file(MAKE_DIRECTORY ${CURRENT_PACKAGES_DIR}/bin)
+    file(MAKE_DIRECTORY ${CURRENT_PACKAGES_DIR}/debug/bin)
+    file (RENAME ${CURRENT_PACKAGES_DIR}/lib/libmysql.dll ${CURRENT_PACKAGES_DIR}/bin/libmysql.dll)
+    file (RENAME ${CURRENT_PACKAGES_DIR}/lib/libmysql.pdb ${CURRENT_PACKAGES_DIR}/bin/libmysql.pdb)
+    file (RENAME ${CURRENT_PACKAGES_DIR}/debug/lib/libmysql.dll ${CURRENT_PACKAGES_DIR}/debug/bin/libmysql.dll)
+    file (RENAME ${CURRENT_PACKAGES_DIR}/debug/lib/libmysql.pdb ${CURRENT_PACKAGES_DIR}/debug/bin/libmysql.pdb)
 endif()
 
-file(READ ${CURRENT_PACKAGES_DIR}/include/mysql/mysql_com.h _contents)
-string(REPLACE "#include <mysql/udf_registration_types.h>" "#include \"mysql/udf_registration_types.h\"" _contents "${_contents}")
-file(WRITE ${CURRENT_PACKAGES_DIR}/include/mysql/mysql_com.h "${_contents}")
-
 # copy license
-file(INSTALL ${SOURCE_PATH}/LICENSE DESTINATION ${CURRENT_PACKAGES_DIR}/share/${PORT} RENAME copyright)
+file(COPY ${SOURCE_PATH}/COPYING DESTINATION ${CURRENT_PACKAGES_DIR}/share/libmysql)
+file(RENAME ${CURRENT_PACKAGES_DIR}/share/libmysql/COPYING ${CURRENT_PACKAGES_DIR}/share/libmysql/copyright)
