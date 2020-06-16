@@ -50,7 +50,7 @@ namespace vcpkg::Commands::CI
     }};
 
     const CommandStructure COMMAND_STRUCTURE = {
-        Help::create_example_string("ci x64-windows"),
+        create_example_string("ci x64-windows"),
         1,
         SIZE_MAX,
         {CI_SWITCHES, CI_SETTINGS},
@@ -257,6 +257,7 @@ namespace vcpkg::Commands::CI
         const CMakeVars::CMakeVarProvider& var_provider,
         const std::vector<FullPackageSpec>& specs,
         const bool purge_tombstones,
+        const bool binary_caching_enabled,
         IBinaryProvider& binaryprovider)
     {
         auto ret = std::make_unique<UnknownCIPortsResults>();
@@ -271,7 +272,7 @@ namespace vcpkg::Commands::CI
             Build::CleanPackages::YES,
             Build::CleanDownloads::NO,
             Build::DownloadTool::BUILT_IN,
-            GlobalState::g_binary_caching ? Build::BinaryCaching::YES : Build::BinaryCaching::NO,
+            binary_caching_enabled ? Build::BinaryCaching::YES : Build::BinaryCaching::NO,
             Build::FailOnTombstone::YES,
         };
 
@@ -387,7 +388,7 @@ namespace vcpkg::Commands::CI
 
     void perform_and_exit(const VcpkgCmdArguments& args, const VcpkgPaths& paths, Triplet default_triplet)
     {
-        if (!GlobalState::g_binary_caching)
+        if (!args.binary_caching_enabled())
         {
             System::print2(System::Color::warning, "Warning: Running ci without binary caching!\n");
         }
@@ -396,12 +397,6 @@ namespace vcpkg::Commands::CI
             create_binary_provider_from_configs(paths, args.binarysources).value_or_exit(VCPKG_LINE_INFO);
 
         const ParsedArguments options = args.parse_arguments(COMMAND_STRUCTURE);
-
-        auto& filesystem = paths.get_filesystem();
-        if (filesystem.is_directory(paths.installed))
-        {
-            filesystem.remove_all_inside(paths.installed, VCPKG_LINE_INFO);
-        }
 
         std::set<std::string> exclusions_set;
         auto it_exclusions = options.settings.find(OPTION_EXCLUDE);
@@ -436,7 +431,7 @@ namespace vcpkg::Commands::CI
             Build::CleanPackages::YES,
             Build::CleanDownloads::NO,
             Build::DownloadTool::BUILT_IN,
-            GlobalState::g_binary_caching ? Build::BinaryCaching::YES : Build::BinaryCaching::NO,
+            args.binary_caching_enabled() ? Build::BinaryCaching::YES : Build::BinaryCaching::NO,
             Build::FailOnTombstone::YES,
             Build::PurgeDecompressFailure::YES,
         };
@@ -472,6 +467,7 @@ namespace vcpkg::Commands::CI
                                                          var_provider,
                                                          all_default_full_specs,
                                                          purge_tombstones,
+                                                         args.binary_caching_enabled(),
                                                          *binaryprovider);
             PortFileProvider::MapPortFileProvider new_default_provider(split_specs->default_feature_provider);
 
@@ -558,11 +554,11 @@ namespace vcpkg::Commands::CI
             System::print2("Total elapsed time: ", result.summary.total_elapsed_time, "\n");
             result.summary.print();
         }
-        auto& fs = paths.get_filesystem();
+
         auto it_xunit = options.settings.find(OPTION_XUNIT);
         if (it_xunit != options.settings.end())
         {
-            fs.write_contents(fs::u8path(it_xunit->second), xunitTestResults.build_xml(), VCPKG_LINE_INFO);
+            paths.get_filesystem().write_contents(fs::u8path(it_xunit->second), xunitTestResults.build_xml(), VCPKG_LINE_INFO);
         }
 
         Checks::exit_success(VCPKG_LINE_INFO);
