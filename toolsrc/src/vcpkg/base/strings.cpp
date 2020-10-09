@@ -1,5 +1,3 @@
-#include "pch.h"
-
 #include <vcpkg/base/checks.h>
 #include <vcpkg/base/strings.h>
 #include <vcpkg/base/util.h>
@@ -146,6 +144,13 @@ std::string Strings::trim(std::string&& s)
     return std::move(s);
 }
 
+StringView Strings::trim(StringView sv)
+{
+    auto last = std::find_if_not(sv.rbegin(), sv.rend(), details::is_space).base();
+    auto first = std::find_if_not(sv.begin(), sv.end(), details::is_space);
+    return StringView(first, last);
+}
+
 void Strings::trim_all_and_remove_whitespace_strings(std::vector<std::string>* strings)
 {
     for (std::string& s : *strings)
@@ -173,6 +178,15 @@ std::vector<std::string> Strings::split(StringView s, const char delimiter)
         output.emplace_back(first, next);
         first = next;
     }
+}
+
+std::vector<std::string> Strings::split_paths(StringView s)
+{
+#if defined(_WIN32)
+    return Strings::split(s, ';');
+#else // ^^^ defined(_WIN32) // !defined(_WIN32) vvv
+    return Strings::split(s, ':');
+#endif
 }
 
 const char* Strings::find_first_of(StringView input, StringView chars)
