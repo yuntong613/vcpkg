@@ -13,6 +13,7 @@
 #include <vcpkg/binarycaching.h>
 #include <vcpkg/build.h>
 #include <vcpkg/buildenvironment.h>
+#include <vcpkg/cmakevars.h>
 #include <vcpkg/commands.h>
 #include <vcpkg/commands.version.h>
 #include <vcpkg/dependencies.h>
@@ -21,6 +22,7 @@
 #include <vcpkg/input.h>
 #include <vcpkg/metrics.h>
 #include <vcpkg/paragraphs.h>
+#include <vcpkg/portfileprovider.h>
 #include <vcpkg/postbuildlint.h>
 #include <vcpkg/statusparagraphs.h>
 #include <vcpkg/tools.h>
