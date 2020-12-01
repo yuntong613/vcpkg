@@ -305,7 +305,8 @@ namespace vcpkg::Install
     using Build::BuildResult;
     using Build::ExtendedBuildResult;
 
-    static ExtendedBuildResult perform_install_plan_action(const VcpkgPaths& paths,
+    static ExtendedBuildResult perform_install_plan_action(const VcpkgCmdArguments& args,
+                                                           const VcpkgPaths& paths,
                                                            InstallPlanAction& action,
                                                            StatusParagraphs& status_db,
                                                            IBinaryProvider& binaries_provider,
@@ -336,7 +337,7 @@ namespace vcpkg::Install
             else
                 System::printf("Building package %s...\n", display_name_with_features);
 
-            auto result = Build::build_package(paths, action, binaries_provider, build_logs_recorder, status_db);
+            auto result = Build::build_package(args, paths, action, binaries_provider, build_logs_recorder, status_db);
 
             if (BuildResult::DOWNLOADED == result.code)
             {
@@ -454,7 +455,8 @@ namespace vcpkg::Install
         TrackedPackageInstallGuard& operator=(const TrackedPackageInstallGuard&) = delete;
     };
 
-    InstallSummary perform(ActionPlan& action_plan,
+    InstallSummary perform(const VcpkgCmdArguments& args,
+                           ActionPlan& action_plan,
                            const KeepGoing keep_going,
                            const VcpkgPaths& paths,
                            StatusParagraphs& status_db,
@@ -476,17 +478,19 @@ namespace vcpkg::Install
         {
             results.emplace_back(action.spec, &action);
             results.back().build_result =
-                perform_install_plan_action(paths, action, status_db, binaryprovider, build_logs_recorder);
+                perform_install_plan_action(args, paths, action, status_db, binaryprovider, build_logs_recorder);
         }
 
         Build::compute_all_abis(paths, action_plan, var_provider, status_db);
 
-        binaryprovider.prefetch(paths, action_plan);
+        auto to_prefetch = Util::fmap(action_plan.install_actions, [](const auto& x) { return &x; });
+        binaryprovider.prefetch(paths, to_prefetch);
 
         for (auto&& action : action_plan.install_actions)
         {
             TrackedPackageInstallGuard this_install(package_count, results, action.spec);
-            auto result = perform_install_plan_action(paths, action, status_db, binaryprovider, build_logs_recorder);
+            auto result =
+                perform_install_plan_action(args, paths, action, status_db, binaryprovider, build_logs_recorder);
             if (result.code != BuildResult::SUCCEEDED && keep_going == KeepGoing::NO)
             {
                 System::print2(Build::create_user_troubleshooting_message(action.spec), '\n');
@@ -758,7 +762,7 @@ namespace vcpkg::Install
         const bool no_downloads = Util::Sets::contains(options.switches, (OPTION_NO_DOWNLOADS));
         const bool only_downloads = Util::Sets::contains(options.switches, (OPTION_ONLY_DOWNLOADS));
         const bool is_recursive = Util::Sets::contains(options.switches, (OPTION_RECURSE));
-        const bool is_editable = Util::Sets::contains(options.switches, (OPTION_EDITABLE));
+        const bool is_editable = Util::Sets::contains(options.switches, (OPTION_EDITABLE)) || !args.cmake_args.empty();
         const bool use_aria2 = Util::Sets::contains(options.switches, (OPTION_USE_ARIA2));
         const bool clean_after_build = Util::Sets::contains(options.switches, (OPTION_CLEAN_AFTER_BUILD));
         const KeepGoing keep_going =
@@ -797,7 +801,7 @@ namespace vcpkg::Install
                 Metrics::g_metrics.lock()->track_property("x-write-nuget-packages-config", "defined");
                 pkgsconfig = fs::u8path(it_pkgsconfig->second);
             }
-            auto manifest_path = paths.get_manifest_path().value_or_exit(VCPKG_LINE_INFO);
+            const auto& manifest_path = paths.get_manifest_path().value_or_exit(VCPKG_LINE_INFO);
             auto maybe_manifest_scf = SourceControlFile::parse_manifest_file(manifest_path, *manifest);
             if (!maybe_manifest_scf)
             {
@@ -806,7 +810,13 @@ namespace vcpkg::Install
                                "more information.\n");
                 Checks::exit_fail(VCPKG_LINE_INFO);
             }
+
             auto& manifest_scf = *maybe_manifest_scf.value_or_exit(VCPKG_LINE_INFO);
+
+            if (auto maybe_error = manifest_scf.check_against_feature_flags(manifest_path, paths.get_feature_flags()))
+            {
+                Checks::exit_with_message(VCPKG_LINE_INFO, maybe_error.value_or_exit(VCPKG_LINE_INFO));
+            }
 
             std::vector<std::string> features;
             auto manifest_feature_it = options.multisettings.find(OPTION_MANIFEST_FEATURE);
@@ -927,7 +937,7 @@ namespace vcpkg::Install
 
         Metrics::g_metrics.lock()->track_property("installplan_1", specs_string);
 
-        Dependencies::print_plan(action_plan, is_recursive, paths.ports);
+        Dependencies::print_plan(action_plan, is_recursive, paths.builtin_ports_directory());
 
         auto it_pkgsconfig = options.settings.find(OPTION_WRITE_PACKAGES_CONFIG);
         if (it_pkgsconfig != options.settings.end())
@@ -947,7 +957,8 @@ namespace vcpkg::Install
         }
 
         const InstallSummary summary =
-            perform(action_plan,
+            perform(args,
+                    action_plan,
                     keep_going,
                     paths,
                     status_db,

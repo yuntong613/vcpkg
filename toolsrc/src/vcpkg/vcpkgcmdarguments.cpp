@@ -283,6 +283,7 @@ namespace vcpkg
                     {OVERLAY_PORTS_ARG, &VcpkgCmdArguments::overlay_ports},
                     {OVERLAY_TRIPLETS_ARG, &VcpkgCmdArguments::overlay_triplets},
                     {BINARY_SOURCES_ARG, &VcpkgCmdArguments::binary_sources},
+                    {CMAKE_SCRIPT_ARG, &VcpkgCmdArguments::cmake_args},
                 };
 
             constexpr static std::pair<StringView, Optional<bool> VcpkgCmdArguments::*> switches[] = {
@@ -293,6 +294,7 @@ namespace vcpkg
                 {FEATURE_PACKAGES_SWITCH, &VcpkgCmdArguments::feature_packages},
                 {BINARY_CACHING_SWITCH, &VcpkgCmdArguments::binary_caching},
                 {WAIT_FOR_LOCK_SWITCH, &VcpkgCmdArguments::wait_for_lock},
+                {IGNORE_LOCK_FAILURES_SWITCH, &VcpkgCmdArguments::ignore_lock_failures},
                 {JSON_SWITCH, &VcpkgCmdArguments::json},
             };
 
@@ -663,6 +665,14 @@ namespace vcpkg
         from_env(DEFAULT_VISUAL_STUDIO_PATH_ENV, default_visual_studio_path);
 
         {
+            const auto vcpkg_disable_lock = System::get_environment_variable(IGNORE_LOCK_FAILURES_ENV);
+            if (vcpkg_disable_lock.has_value() && !ignore_lock_failures.has_value())
+            {
+                ignore_lock_failures = true;
+            }
+        }
+
+        {
             const auto vcpkg_overlay_ports_env = System::get_environment_variable(OVERLAY_PORTS_ENV);
             if (const auto unpacked = vcpkg_overlay_ports_env.get())
             {
@@ -911,6 +921,7 @@ namespace vcpkg
     constexpr StringLiteral VcpkgCmdArguments::TRIPLET_ARG;
     constexpr StringLiteral VcpkgCmdArguments::OVERLAY_PORTS_ENV;
     constexpr StringLiteral VcpkgCmdArguments::OVERLAY_PORTS_ARG;
+    constexpr StringLiteral VcpkgCmdArguments::OVERLAY_TRIPLETS_ENV;
     constexpr StringLiteral VcpkgCmdArguments::OVERLAY_TRIPLETS_ARG;
 
     constexpr StringLiteral VcpkgCmdArguments::BINARY_SOURCES_ARG;
@@ -922,6 +933,8 @@ namespace vcpkg
     constexpr StringLiteral VcpkgCmdArguments::PRINT_METRICS_SWITCH;
 
     constexpr StringLiteral VcpkgCmdArguments::WAIT_FOR_LOCK_SWITCH;
+    constexpr StringLiteral VcpkgCmdArguments::IGNORE_LOCK_FAILURES_SWITCH;
+    constexpr StringLiteral VcpkgCmdArguments::IGNORE_LOCK_FAILURES_ENV;
 
     constexpr StringLiteral VcpkgCmdArguments::JSON_SWITCH;
 
@@ -936,4 +949,6 @@ namespace vcpkg
     constexpr StringLiteral VcpkgCmdArguments::REGISTRIES_FEATURE;
     constexpr StringLiteral VcpkgCmdArguments::RECURSIVE_DATA_ENV;
     constexpr StringLiteral VcpkgCmdArguments::VERSIONS_FEATURE;
+
+    constexpr StringLiteral VcpkgCmdArguments::CMAKE_SCRIPT_ARG;
 }
