@@ -10,7 +10,7 @@
     "openssl",
     {
       "name": "pthreads",
-      "platform": "!windows"
+      "platform": "windows"
     },
     "zlib"
   ]
