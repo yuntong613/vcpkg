@@ -22,7 +22,7 @@
     "mariadb": {
       "description": "MariaDB support for POCO",
       "dependencies": [
-        "libmariadb"
+		"libmariadb"
       ]
     },
     "mysql": {
