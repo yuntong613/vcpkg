@@ -28,6 +28,8 @@ vcpkg_from_github(
       0015-fix-freetype.patch
       0017-fix-flatbuffers.patch
       0019-missing-include.patch
+      0020-fix-compat-cuda12.2.patch
+      0021-static-openvino.patch # https://github.com/opencv/opencv/pull/23963
       "${ARM64_WINDOWS_FIX}"
 )
 # Disallow accidental build of vendored copies
@@ -84,9 +86,13 @@ vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
 
 # Cannot use vcpkg_check_features() for "dnn", "gtk", ipp", "openmp", "ovis", "python", "qt", "tbb"
 set(BUILD_opencv_dnn OFF)
+set(WITH_OPENVINO OFF)
 if("dnn" IN_LIST FEATURES)
   if(NOT VCPKG_TARGET_IS_ANDROID)
     set(BUILD_opencv_dnn ON)
+    if(NOT VCPKG_TARGET_IS_UWP)
+      set(WITH_OPENVINO ON)
+    endif()
   else()
     message(WARNING "The dnn module cannot be enabled on Android")
   endif()
@@ -445,6 +451,7 @@ vcpkg_cmake_configure(
         -DWITH_PROTOBUF=${BUILD_opencv_dnn}
         -DWITH_PYTHON=${WITH_PYTHON}
         -DWITH_OPENCLAMDBLAS=OFF
+        -DWITH_OPENVINO=${WITH_OPENVINO}
         -DWITH_TBB=${WITH_TBB}
         -DWITH_OPENJPEG=OFF
         -DWITH_CPUFEATURES=OFF
@@ -525,6 +532,9 @@ find_dependency(Tesseract)")
   if("lapack" IN_LIST FEATURES)
     string(APPEND DEPS_STRING "\nfind_dependency(LAPACK)")
   endif()
+  if(WITH_OPENVINO)
+    string(APPEND DEPS_STRING "\nfind_dependency(OpenVINO CONFIG)")
+  endif()
   if("openexr" IN_LIST FEATURES)
     string(APPEND DEPS_STRING "\nfind_dependency(OpenEXR CONFIG)")
   endif()
@@ -532,7 +542,7 @@ find_dependency(Tesseract)")
     string(APPEND DEPS_STRING "\nfind_dependency(OpenMP)")
   endif()
   if(BUILD_opencv_ovis)
-    string(APPEND DEPS_STRING "\nfind_dependency(Ogre)")
+    string(APPEND DEPS_STRING "\nfind_dependency(OGRE)")
   endif()
   if("quirc" IN_LIST FEATURES)
     string(APPEND DEPS_STRING "\nfind_dependency(quirc)")
