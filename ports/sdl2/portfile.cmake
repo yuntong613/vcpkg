@@ -2,7 +2,7 @@ vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO libsdl-org/SDL
     REF "release-${VERSION}"
-    SHA512 1df251333904c8530736a04cd699bcb2b786ad4bcb50e4d67e30cf7e857a46d60aeb48ebea8670f8aecc5632b3cfe635499721ed0cd72f6c8330d5e8ad32aacc
+    SHA512 ad5aa45e1da6f347d9e310317b08ea7de9a8973e1f0d9d9a41a21dce8b25f87dba77ff5451e597241d2688c2ebe6dd5ae4fff6b650c326e1e9b8ff7d24f07d6f
     HEAD_REF main
     PATCHES
         deps.patch
@@ -17,6 +17,7 @@ string(COMPARE EQUAL "${VCPKG_CRT_LINKAGE}" "static" FORCE_STATIC_VCRT)
 vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
     FEATURES
         alsa     SDL_ALSA
+        dbus     SDL_DBUS
         ibus     SDL_IBUS
         samplerate SDL_LIBSAMPLERATE
         vulkan   SDL_VULKAN

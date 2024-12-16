@@ -31,7 +31,10 @@
       "name": "curl",
       "features": [
         "gsasl",
-        "psl"
+        "mbedtls",
+        "openssl",
+        "psl",
+        "wolfssl"
       ],
       "platform": "!uwp"
     },
@@ -49,6 +52,13 @@
         "tool"
       ],
       "platform": "!android & !uwp"
+    },
+    {
+      "name": "curl",
+      "features": [
+        "gnutls"
+      ],
+      "platform": "!arm & !android & !xbox"
     }
   ]
 }
