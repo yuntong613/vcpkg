@@ -14,6 +14,11 @@ endif()
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
+set(WITH_SQLITE3_PLUGIN OFF)
+if("sqlite3plugin" IN_LIST FEATURES)
+    set(WITH_SQLITE3_PLUGIN ON)
+endif()
+
 set(WITH_PGSQL_PLUGIN OFF)
 if("postgresqlplugin" IN_LIST FEATURES)
     set(WITH_PGSQL_PLUGIN ON)
@@ -22,6 +27,11 @@ endif()
 set(WITH_MYSQL_PLUGIN OFF)
 if ("mysqlplugin" IN_LIST FEATURES)
     set(WITH_MYSQL_PLUGIN  ON)
+endif()
+
+set(WITH_OPENSSL OFF)
+if ("openssl" IN_LIST FEATURES)
+    set(WITH_OPENSSL ON)
 endif()
 
 include(qt_port_functions)
@@ -107,11 +117,9 @@ list(APPEND CORE_OPTIONS
     -system-freetype
     -system-pcre
     -system-doubleconversion
-    -system-sqlite
     -system-harfbuzz
     -no-angle # Qt does not need to build angle. VCPKG will build angle!
     -no-glib
-    -openssl-linked
     -no-feature-gssapi
     )
 
@@ -124,6 +132,11 @@ else()
     list(APPEND CORE_OPTIONS -dbus-runtime)
 endif()
 
+if(WITH_SQLITE3_PLUGIN)
+    list(APPEND CORE_OPTIONS -system-sqlite)
+else()
+    list(APPEND CORE_OPTIONS -no-sql-sqlite)
+endif()
 if(WITH_PGSQL_PLUGIN)
     list(APPEND CORE_OPTIONS -sql-psql)
 else()
@@ -133,6 +146,12 @@ if(WITH_MYSQL_PLUGIN)
     list(APPEND CORE_OPTIONS -sql-mysql)
 else()
     list(APPEND CORE_OPTIONS -no-sql-mysql)
+endif()
+
+if(WITH_OPENSSL)
+    list(APPEND CORE_OPTIONS -openssl-linked)
+else()
+    list(APPEND CORE_OPTIONS -no-openssl)
 endif()
 
 if ("vulkan" IN_LIST FEATURES)
@@ -167,7 +186,7 @@ find_library(DOUBLECONVERSION_RELEASE NAMES double-conversion PATHS "${CURRENT_I
 find_library(DOUBLECONVERSION_DEBUG NAMES double-conversion PATHS "${CURRENT_INSTALLED_DIR}/debug/lib" NO_DEFAULT_PATH)
 find_library(HARFBUZZ_RELEASE NAMES harfbuzz PATHS "${CURRENT_INSTALLED_DIR}/lib" NO_DEFAULT_PATH)
 find_library(HARFBUZZ_DEBUG NAMES harfbuzz PATHS "${CURRENT_INSTALLED_DIR}/debug/lib" NO_DEFAULT_PATH)
-find_library(SQLITE_RELEASE NAMES sqlite3 PATHS "${CURRENT_INSTALLED_DIR}/lib" NO_DEFAULT_PATH) # Depends on openssl and zlib(linux)
+find_library(SQLITE_RELEASE NAMES sqlite3 PATHS "${CURRENT_INSTALLED_DIR}/lib" NO_DEFAULT_PATH)
 find_library(SQLITE_DEBUG NAMES sqlite3 sqlite3d PATHS "${CURRENT_INSTALLED_DIR}/debug/lib" NO_DEFAULT_PATH)
 
 find_library(BROTLI_COMMON_RELEASE NAMES brotlicommon brotlicommon-static PATHS "${CURRENT_INSTALLED_DIR}/lib" NO_DEFAULT_PATH)
@@ -270,14 +289,20 @@ if(VCPKG_TARGET_IS_WINDOWS)
     list(APPEND RELEASE_OPTIONS
             "SQLITE_LIBS=${SQLITE_RELEASE}"
             "HARFBUZZ_LIBS=${harfbuzz_LIBRARIES_RELEASE}"
-            "OPENSSL_LIBS=${SSL_RELEASE} ${EAY_RELEASE} ${ADDITIONAL_WINDOWS_LIBS}"
         )
 
     list(APPEND DEBUG_OPTIONS
             "SQLITE_LIBS=${SQLITE_DEBUG}"
             "HARFBUZZ_LIBS=${harfbuzz_LIBRARIES_DEBUG}"
-            "OPENSSL_LIBS=${SSL_DEBUG} ${EAY_DEBUG} ${ADDITIONAL_WINDOWS_LIBS}"
         )
+
+    if(WITH_OPENSSL)
+        list(APPEND RELEASE_OPTIONS "OPENSSL_LIBS=${SSL_RELEASE} ${EAY_RELEASE} ${ADDITIONAL_WINDOWS_LIBS}")
+        list(APPEND DEBUG_OPTIONS "OPENSSL_LIBS=${SSL_DEBUG} ${EAY_DEBUG} ${ADDITIONAL_WINDOWS_LIBS}")
+    else()
+        list(APPEND CORE_OPTIONS -schannel)
+    endif()
+
     if(WITH_PGSQL_PLUGIN)
         list(APPEND RELEASE_OPTIONS "PSQL_LIBS=${PSQL_RELEASE} ${PSQL_PORT_RELEASE} ${PSQL_COMMON_RELEASE} ${SSL_RELEASE} ${EAY_RELEASE} ${ADDITIONAL_WINDOWS_LIBS} -lwldap32")
         list(APPEND DEBUG_OPTIONS "PSQL_LIBS=${PSQL_DEBUG} ${PSQL_PORT_DEBUG} ${PSQL_COMMON_DEBUG} ${SSL_DEBUG} ${EAY_DEBUG} ${ADDITIONAL_WINDOWS_LIBS} -lwldap32")
@@ -287,15 +312,19 @@ elseif(VCPKG_TARGET_IS_LINUX)
     list(APPEND RELEASE_OPTIONS
             "SQLITE_LIBS=${SQLITE_RELEASE} -ldl -lpthread"
             "HARFBUZZ_LIBS=${harfbuzz_LIBRARIES_RELEASE}"
-            "OPENSSL_LIBS=${SSL_RELEASE} ${EAY_RELEASE} -ldl -lpthread"
             "FONTCONFIG_LIBS=${FONTCONFIG_RELEASE} ${FREETYPE_RELEASE} ${EXPAT_RELEASE} -luuid"
         )
     list(APPEND DEBUG_OPTIONS
             "SQLITE_LIBS=${SQLITE_DEBUG} -ldl -lpthread"
             "HARFBUZZ_LIBS=${harfbuzz_LIBRARIES_DEBUG}"
-            "OPENSSL_LIBS=${SSL_DEBUG} ${EAY_DEBUG} -ldl -lpthread"
             "FONTCONFIG_LIBS=${FONTCONFIG_DEBUG} ${FREETYPE_DEBUG} ${EXPAT_DEBUG} -luuid"
         )
+
+    if(WITH_OPENSSL)
+        list(APPEND RELEASE_OPTIONS "OPENSSL_LIBS=${SSL_RELEASE} ${EAY_RELEASE} -ldl -lpthread")
+        list(APPEND DEBUG_OPTIONS "OPENSSL_LIBS=${SSL_DEBUG} ${EAY_DEBUG} -ldl -lpthread")
+    endif()
+
     if(WITH_PGSQL_PLUGIN)
         list(APPEND RELEASE_OPTIONS "PSQL_LIBS=${PSQL_RELEASE} ${PSQL_PORT_RELEASE} ${PSQL_TYPES_RELEASE} ${PSQL_COMMON_RELEASE} ${SSL_RELEASE} ${EAY_RELEASE} -ldl -lpthread")
         list(APPEND DEBUG_OPTIONS "PSQL_LIBS=${PSQL_DEBUG} ${PSQL_PORT_DEBUG} ${PSQL_TYPES_DEBUG} ${PSQL_COMMON_DEBUG} ${SSL_DEBUG} ${EAY_DEBUG} -ldl -lpthread")
@@ -366,15 +395,18 @@ elseif(VCPKG_TARGET_IS_OSX)
     list(APPEND RELEASE_OPTIONS
             "SQLITE_LIBS=${SQLITE_RELEASE} -ldl -lpthread"
             "HARFBUZZ_LIBS=${harfbuzz_LIBRARIES_RELEASE} -framework ApplicationServices"
-            "OPENSSL_LIBS=${SSL_RELEASE} ${EAY_RELEASE} -ldl -lpthread"
             "FONTCONFIG_LIBS=${FONTCONFIG_RELEASE} ${FREETYPE_RELEASE} ${EXPAT_RELEASE} -liconv"
         )
     list(APPEND DEBUG_OPTIONS
             "SQLITE_LIBS=${SQLITE_DEBUG} -ldl -lpthread"
             "HARFBUZZ_LIBS=${harfbuzz_LIBRARIES_DEBUG} -framework ApplicationServices"
-            "OPENSSL_LIBS=${SSL_DEBUG} ${EAY_DEBUG} -ldl -lpthread"
             "FONTCONFIG_LIBS=${FONTCONFIG_DEBUG} ${FREETYPE_DEBUG} ${EXPAT_DEBUG} -liconv"
         )
+
+    if(WITH_OPENSSL)
+        list(APPEND RELEASE_OPTIONS "OPENSSL_LIBS=${SSL_RELEASE} ${EAY_RELEASE} -ldl -lpthread")
+        list(APPEND DEBUG_OPTIONS "OPENSSL_LIBS=${SSL_DEBUG} ${EAY_DEBUG} -ldl -lpthread")
+    endif()
 
     if(WITH_PGSQL_PLUGIN)
         list(APPEND RELEASE_OPTIONS "PSQL_LIBS=${PSQL_RELEASE} ${PSQL_PORT_RELEASE} ${PSQL_TYPES_RELEASE} ${PSQL_COMMON_RELEASE} ${SSL_RELEASE} ${EAY_RELEASE} -ldl -lpthread")

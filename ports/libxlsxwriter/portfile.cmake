@@ -2,12 +2,17 @@ vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO jmcnamara/libxlsxwriter
     REF "v${VERSION}"
-    SHA512 cca431b04eb51444f4dd8f096d50061726277a72e9ec216f9ac88b89dca1b227949ce3aa652bb2e81d1244b04ecdef791b0abde1dcc5b206aa36079a962aaab3
+    SHA512 f89a5ec32526ecc080037710e328467f2231b0f99be5f3b8336fb3be45f0786761fdcf28db57f27f85ece62e88830d770547fdde38545327299f7d041becbaf5
     HEAD_REF main
-    PATCHES
-        dependencies.diff
 )
 file(REMOVE_RECURSE "${SOURCE_PATH}/third_party/minizip")
+
+vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
+    FEATURES
+    "dtoa"        USE_DTOA_LIBRARY
+    "openssl-md5" USE_OPENSSL_MD5
+    "mem-file"    USE_MEM_FILE
+)
 
 set(USE_WINDOWSSTORE OFF)
 if (VCPKG_TARGET_IS_UWP)
@@ -17,9 +22,9 @@ endif()
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
-        -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON
         -DUSE_SYSTEM_MINIZIP=1
         -DWINDOWSSTORE=${USE_WINDOWSSTORE}
+        ${FEATURE_OPTIONS}
 )
 
 vcpkg_cmake_install()
