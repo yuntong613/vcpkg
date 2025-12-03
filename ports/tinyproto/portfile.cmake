@@ -3,12 +3,17 @@ vcpkg_check_linkage(ONLY_STATIC_LIBRARY)
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO lexus2k/tinyproto
-    REF dc7a6c2186fdb38f0a263d26e81e204437b7ee66 # 1.0.0 + 156 commits
-    SHA512 13dc128567357b08cdee15ab710649f9eaaf58b466afba429ac0059aeaa4c908445dd20e9576ddfd471712aa7556805b7d415c2e7c6d8e8a00d7c076d0d270c2
+    REF v${VERSION}
+    SHA512 32b21822d5516a46ae931b0a4455a212d9b6b7c5a04f6c20b16fa5ce751707cf93a4478ef62262e0478acb076e1ac627ba62e591c07175b63906d9881df64704
     HEAD_REF master
+    PATCHES
+        fix-deprecated.patch
 )
 
-vcpkg_cmake_configure(SOURCE_PATH "${SOURCE_PATH}")
+vcpkg_cmake_configure(
+	SOURCE_PATH "${SOURCE_PATH}"
+	OPTIONS "-DCMAKE_CXX_STANDARD=11"
+)
 vcpkg_cmake_install()
 vcpkg_cmake_config_fixup(CONFIG_PATH "lib/cmake/tinyproto")
 
